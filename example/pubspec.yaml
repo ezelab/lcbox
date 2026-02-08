@@ -1,0 +1,17 @@
+name: llmchatbox_example
+description: Test harness for the llmchatbox package.
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: ^3.6.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  llmchatbox:
+    path: ../
+  path_provider: ^2.1.5
+
+flutter:
+  uses-material-design: true

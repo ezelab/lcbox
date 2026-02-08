@@ -1,0 +1,26 @@
+name: llmchatbox
+description: >
+  A reusable Flutter widget that wraps LLM web interfaces (Gemini, ChatGPT,
+  Claude, Copilot, Meta AI, DeepSeek) in a WebView with programmatic message
+  send/receive via clipboard interception and copy-button auto-clicking.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  webview_flutter: ^4.13.0
+  webview_windows: ^0.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
