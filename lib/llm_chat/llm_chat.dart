@@ -6,7 +6,7 @@
 ///
 /// ## Quick Start
 /// ```dart
-/// import 'package:llmchatbox/llm_chat/llm_chat.dart';
+/// import 'package:llmchatbox/llmchatbox.dart';
 ///
 /// final controller = LlmChatController(
 ///   llmType: LlmType.chatGpt,
@@ -19,7 +19,7 @@
 /// // In your widget tree:
 /// LlmChatWidget(
 ///   controller: controller,
-///   cookiePersistence: FileCookiePersistence(directory: myDir),
+///   cookiePersistence: myCookiePersistence, // caller-provided implementation
 /// )
 ///
 /// // Send messages:
@@ -36,9 +36,8 @@
 /// - [LlmType] — Enum of supported LLM providers
 /// - [LlmJsProvider] — Base class for LLM-specific JavaScript snippets (with factory)
 /// - [LlmChatController] — Core controller managing queue, state, and callbacks
-/// - [LlmChatWidget] — The Flutter widget embedding the WebView (cross-platform)
-/// - [CookiePersistence] — Abstract interface for cookie/state persistence
-/// - [FileCookiePersistence] — File-based implementation of cookie persistence
+/// - [LlmChatWidget] — The Flutter widget embedding the WebView (cross-platform via `flutter_inappwebview`)
+/// - [CookiePersistence] — Abstract interface for cookie/state persistence (caller-provided)
 library;
 
 export 'llm_type.dart';

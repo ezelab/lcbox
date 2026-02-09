@@ -3,6 +3,9 @@
 /// A reusable Flutter package that wraps 6 LLM web interfaces in a WebView
 /// widget with programmatic message send/receive via clipboard interception.
 ///
+/// Uses `flutter_inappwebview` for cross-platform support (Windows, Android,
+/// iOS, macOS).
+///
 /// ## Supported LLMs
 /// - Google Gemini
 /// - OpenAI ChatGPT
@@ -26,7 +29,8 @@
 /// // In your widget tree:
 /// LlmChatWidget(
 ///   controller: controller,
-///   cookiePersistence: FileCookiePersistence(directory: myDir),
+///   cookiePersistence: myCookiePersistence, // caller-provided implementation
+///   webViewEnvironment: myEnv,              // optional, for shared WebView2 profile
 /// )
 ///
 /// // Send messages programmatically:
@@ -39,7 +43,7 @@
 /// controller.dispose();
 /// ```
 ///
-/// See [README.md](https://github.com/user/llmchatbox) for full documentation.
+/// See [README.md](https://github.com/ezelab/lcbox) for full documentation.
 library;
 
 export 'llm_chat/llm_type.dart';

@@ -4,14 +4,14 @@ A reusable Flutter widget that wraps 6 LLM web interfaces in a WebView with prog
 
 ## Supported LLMs
 
-| LLM | Provider Class | Web URL |
-|-----|---------------|---------|
-| Google Gemini | `GeminiJsProvider` | `gemini.google.com/app` |
-| OpenAI ChatGPT | `ChatGptJsProvider` | `chat.openai.com` |
-| Anthropic Claude | `ClaudeJsProvider` | `claude.ai/new` |
-| Microsoft Copilot | `CopilotJsProvider` | `copilot.microsoft.com` |
-| Meta AI | `MetaAiJsProvider` | `meta.ai` |
-| DeepSeek | `DeepSeekJsProvider` | `chat.deepseek.com` |
+| LLM               | Provider Class       | Web URL                 |
+| ----------------- | -------------------- | ----------------------- |
+| Google Gemini     | `GeminiJsProvider`   | `gemini.google.com/app` |
+| OpenAI ChatGPT    | `ChatGptJsProvider`  | `chat.openai.com`       |
+| Anthropic Claude  | `ClaudeJsProvider`   | `claude.ai/new`         |
+| Microsoft Copilot | `CopilotJsProvider`  | `copilot.microsoft.com` |
+| Meta AI           | `MetaAiJsProvider`   | `meta.ai`               |
+| DeepSeek          | `DeepSeekJsProvider` | `chat.deepseek.com`     |
 
 ## Installation
 
@@ -21,7 +21,7 @@ A reusable Flutter widget that wraps 6 LLM web interfaces in a WebView with prog
 dependencies:
   llmchatbox:
     git:
-      url: https://github.com/youruser/llmchatbox.git
+      url: https://github.com/ezelab/lcbox.git
 ```
 
 ### Local path dependency
@@ -50,24 +50,32 @@ final controller = LlmChatController(
   debug: true,  // enables copious logging
 );
 
-// 2. Add the widget to your tree
+// 2. Implement CookiePersistence (or skip for no persistence)
+class MyCookiePersistence implements CookiePersistence {
+  @override
+  Future<Map<String, String>> loadCookies(String llmId) async { ... }
+  @override
+  Future<void> saveCookies(String llmId, Map<String, String> cookies) async { ... }
+  @override
+  Future<void> clearCookies(String llmId) async { ... }
+}
+
+// 3. Add the widget to your tree
 @override
 Widget build(BuildContext context) {
   return LlmChatWidget(
     controller: controller,
-    cookiePersistence: FileCookiePersistence(
-      directory: Directory('/path/to/cookies'),
-    ),
+    cookiePersistence: MyCookiePersistence(),
   );
 }
 
-// 3. Send messages programmatically
+// 4. Send messages programmatically
 controller.sendToLlm('What is the capital of France?');
 
-// 4. Switch LLM or reset conversation
+// 5. Switch LLM or reset conversation
 controller.resetLlm();
 
-// 5. Clean up
+// 6. Clean up
 controller.dispose();
 ```
 
@@ -79,18 +87,18 @@ controller.dispose();
 │                                                     │
 │  ┌──────────────┐    ┌──────────────────────────┐   │
 │  │ LlmChatWidget│───▶│   LlmChatController      │   │
-│  │  (WebView)   │    │   - message queue         │   │
-│  └──────┬───────┘    │   - send/receive flow     │   │
-│         │            │   - availability state     │   │
-│         ▼            └──────────┬───────────────┘   │
-│  ┌──────────────┐              │                    │
-│  │PlatformWebView│              ▼                    │
-│  │ (Windows/     │    ┌──────────────────────────┐   │
-│  │  Mobile)      │    │   LlmJsProvider          │   │
-│  └──────────────┘    │   (per-LLM JS snippets)   │   │
+│  │ (InAppWebView)│   │   - message queue         │   │
+│  └──────────────┘    │   - send/receive flow     │   │
+│                      │   - availability state     │   │
+│                      └──────────┬───────────────┘   │
+│                                 │                    │
+│                                 ▼                    │
+│                      ┌──────────────────────────┐   │
+│                      │   LlmJsProvider          │   │
+│                      │   (per-LLM JS snippets)   │   │
 │                      └──────────────────────────┘   │
 │  ┌──────────────────┐                               │
-│  │CookiePersistence │  (optional, keeps sessions)   │
+│  │CookiePersistence │  (optional, caller-provided)  │
 │  └──────────────────┘                               │
 └─────────────────────────────────────────────────────┘
 ```
@@ -110,42 +118,69 @@ LlmType.chatGpt.displayName // 'ChatGPT'
 
 The primary programmatic interface.
 
-| Method / Property | Description |
-|---|---|
-| `LlmChatController(llmType, basePrompt, onMessageFromLlm, ...)` | Constructor |
-| `sendToLlm(String message)` | Enqueue a message; sent when LLM is ready |
-| `resetLlm()` | Clear queue, push basePrompt, reload page |
-| `isAvailable` | Whether the LLM is currently usable |
-| `isWaitingForResponse` | Whether we're waiting for a reply |
-| `onMessageFromLlm` | Callback fired with each LLM response |
-| `onLlmAvailabilityChanged` | Callback when availability changes |
-| `dispose()` | Clean up resources |
+| Method / Property                                               | Description                               |
+| --------------------------------------------------------------- | ----------------------------------------- |
+| `LlmChatController(llmType, basePrompt, onMessageFromLlm, ...)` | Constructor                               |
+| `sendToLlm(String message)`                                     | Enqueue a message; sent when LLM is ready |
+| `resetLlm()`                                                    | Clear queue, push basePrompt, reload page |
+| `isAvailable`                                                   | Whether the LLM is currently usable       |
+| `isWaitingForResponse`                                          | Whether we're waiting for a reply         |
+| `onMessageFromLlm`                                              | Callback fired with each LLM response     |
+| `onLlmAvailabilityChanged`                                      | Callback when availability changes        |
+| `dispose()`                                                     | Clean up resources                        |
 
 ### `LlmChatWidget`
 
-The Flutter widget that renders the WebView.
+The Flutter widget that renders the WebView. Uses `flutter_inappwebview` for
+cross-platform support (WebView2 on Windows, native WebView on Android/iOS/macOS).
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `controller` | `LlmChatController` | ✅ | The controller instance |
-| `cookiePersistence` | `CookiePersistence?` | ❌ | Optional cookie/session storage |
-| `userAgent` | `String?` | ❌ | Custom User-Agent string |
+| Parameter             | Type                  | Required | Description                                          |
+| --------------------- | --------------------- | -------- | ---------------------------------------------------- |
+| `controller`          | `LlmChatController`   | ✅        | The controller instance                              |
+| `cookiePersistence`   | `CookiePersistence?`  | ❌        | Optional cookie/session storage (caller-provided)    |
+| `userAgent`           | `String?`             | ❌        | Custom User-Agent string                             |
+| `webViewEnvironment`  | `WebViewEnvironment?` | ❌        | Shared browser profile (Windows WebView2 data folder)|
+
+### `WebViewEnvironment` (optional)
+
+On Windows, pass a `WebViewEnvironment` to share a persistent browser profile
+(cookies, cache, user data folder) with other WebViews in your app. If not
+provided, the default environment is used.
+
+```dart
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+
+final env = await WebViewEnvironment.create(
+  settings: WebViewEnvironmentSettings(userDataFolder: 'path/to/data'),
+);
+
+LlmChatWidget(
+  controller: controller,
+  webViewEnvironment: env,
+);
+```
 
 ### `CookiePersistence`
 
-Abstract interface for session persistence. Use `FileCookiePersistence` for file-based storage, or implement your own:
+Abstract interface for session persistence. The library does **not** include a
+concrete implementation — callers provide their own:
 
 ```dart
-// File-based (built-in)
-FileCookiePersistence(directory: Directory('path/to/cookies'))
+class FileCookiePersistence implements CookiePersistence {
+  final Directory directory;
+  FileCookiePersistence({required this.directory});
 
-// Custom
-class MyCookiePersistence implements CookiePersistence {
+  @override
   Future<Map<String, String>> loadCookies(String llmId) async { ... }
+  @override
   Future<void> saveCookies(String llmId, Map<String, String> cookies) async { ... }
+  @override
   Future<void> clearCookies(String llmId) async { ... }
 }
 ```
+
+See `example/lib/file_cookie_persistence.dart` for a complete file-based
+implementation you can copy into your project.
 
 ### `LlmJsProvider`
 
@@ -157,12 +192,12 @@ final provider = LlmJsProvider.forType(LlmType.chatGpt);
 
 Each provider implements 4 JS snippet methods:
 
-| Method | Purpose |
-|---|---|
-| `jsDetectAvailability()` | Check if LLM is signed in and ready |
-| `jsSendMessage(message)` | Type message into input and click send |
-| `jsInstallCopyMutationObserver()` | Auto-click copy buttons on LLM responses |
-| `jsHookClipboard()` | Intercept clipboard writes to capture response text |
+| Method                            | Purpose                                             |
+| --------------------------------- | --------------------------------------------------- |
+| `jsDetectAvailability()`          | Check if LLM is signed in and ready                 |
+| `jsSendMessage(message)`          | Type message into input and click send              |
+| `jsInstallCopyMutationObserver()` | Auto-click copy buttons on LLM responses            |
+| `jsHookClipboard()`               | Intercept clipboard writes to capture response text |
 
 ## How It Works
 
@@ -170,7 +205,7 @@ Each provider implements 4 JS snippet methods:
 2. **If available** → bridge shim, clipboard hook, and mutation observer are installed
 3. **`sendToLlm()`** → message is queued; JS types it into the input and clicks send
 4. **LLM responds** → mutation observer clicks the copy button on the response
-5. **Copy triggers clipboard** → hooked `navigator.clipboard.writeText` sends text to Dart
+5. **Copy triggers clipboard** → hooked `navigator.clipboard.writeText` sends text to Dart via `window.flutter_inappwebview.callHandler('LlmBridge', text)`
 6. **`onMessageFromLlm` fires** → your callback receives the response text
 7. **Queue drains** → next queued message is sent automatically
 
@@ -193,13 +228,13 @@ LlmChatController(
 
 ## Platform Support
 
-| Platform | WebView Backend | Status |
-|----------|----------------|--------|
-| Windows | `webview_windows` (WebView2/Edge) | ✅ Tested |
-| Android | `webview_flutter` | 🔧 Supported |
-| iOS | `webview_flutter` | 🔧 Supported |
-| macOS | `webview_flutter` | 🔧 Supported |
-| Web | Not supported | ❌ |
+| Platform | WebView Backend                            | Status       |
+| -------- | ------------------------------------------ | ------------ |
+| Windows  | `flutter_inappwebview` (WebView2/Edge)     | ✅ Tested     |
+| Android  | `flutter_inappwebview` (Android WebView)   | 🔧 Supported |
+| iOS      | `flutter_inappwebview` (WKWebView)         | 🔧 Supported |
+| macOS    | `flutter_inappwebview` (WKWebView)         | 🔧 Supported |
+| Web      | Not supported (no WebView embedding)       | ❌            |
 
 ## Adding a New LLM Provider
 
@@ -225,14 +260,16 @@ class MyLlmJsProvider with DefaultJsSnippets implements LlmJsProvider {
 
 ## Test Harness
 
-The included `lib/main.dart` is a full test harness with:
-- LLM picker dropdown to switch between providers
-- Manual test buttons (full 5-test suite and lite PONG test)
-- Cookie persistence for staying logged in
-- Auto-run capability for batch testing across all LLMs
+The included `example/` app is a full test harness with:
+
+* LLM picker dropdown to switch between providers
+* Manual test buttons (full 5-test suite and lite PONG test)
+* Cookie persistence (file-based, in `example/lib/file_cookie_persistence.dart`)
 
 Run it with:
+
 ```bash
+cd example
 flutter run -d windows   # or android, ios, etc.
 ```
 
