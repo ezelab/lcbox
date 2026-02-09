@@ -209,10 +209,15 @@ class _LlmChatWidgetState extends State<LlmChatWidget> {
 
   @override
   void dispose() {
+    if (_disposed) {
+      super.dispose();
+      return;
+    }
     _log('Widget disposing');
     _disposed = true;
-    _controller?.dispose();
+    final c = _controller;
     _controller = null;
+    c?.dispose();
     super.dispose();
   }
 
