@@ -47,5 +47,3 @@ export 'llm_chat/llm_js_provider.dart';
 export 'llm_chat/llm_chat_controller.dart';
 export 'llm_chat/llm_chat_widget.dart';
 export 'llm_chat/cookie_persistence.dart';
-export 'llm_chat/platform/platform_webview.dart';
-export 'llm_chat/platform/platform_webview_factory.dart';

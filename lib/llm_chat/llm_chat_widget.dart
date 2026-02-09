@@ -1,18 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import 'llm_type.dart';
 import 'llm_chat_controller.dart';
 import 'cookie_persistence.dart';
-import 'platform/platform_webview.dart';
-import 'platform/platform_webview_factory.dart';
 
 /// A Flutter widget that embeds an LLM web interface in a WebView.
 ///
-/// This widget is **cross-platform**: it auto-selects the correct WebView
-/// backend for the running platform:
-/// - **Windows**: WebView2/Edge via `webview_windows`
-/// - **Android/iOS/macOS/web**: `webview_flutter`
+/// Uses `flutter_inappwebview` for cross-platform WebView support
+/// (WebView2 on Windows, native WebView on Android/iOS/macOS).
 ///
 /// ## Parameters
 ///
@@ -21,6 +18,9 @@ import 'platform/platform_webview_factory.dart';
 ///   saving/restoring cookies across sessions. When provided, cookies are loaded
 ///   before navigation and saved periodically.
 /// - **[userAgent]** (optional): Custom User-Agent string for the WebView.
+/// - **[webViewEnvironment]** (optional): A [WebViewEnvironment] for sharing a
+///   persistent browser profile (cookies, cache) with other WebViews. If not
+///   provided, the default environment is used.
 ///
 /// ## Example
 /// ```dart
@@ -47,10 +47,9 @@ import 'platform/platform_webview_factory.dart';
 /// - Use the LLM type name as the persistence key
 ///
 /// ## JavaScript Bridge
-/// The clipboard-hook JS sends intercepted text back to Dart. The bridge
-/// call varies by platform and is handled transparently:
-/// - `webview_flutter`: `LlmBridge.postMessage(text)`
-/// - `webview_windows`: `window.chrome.webview.postMessage(text)`
+/// A JavaScript handler named `LlmBridge` is registered on the WebView.
+/// The clipboard-hook JS sends intercepted text back to Dart via
+/// `window.flutter_inappwebview.callHandler('LlmBridge', text)`.
 class LlmChatWidget extends StatefulWidget {
   /// The controller managing LLM interaction state.
   final LlmChatController controller;
@@ -61,11 +60,18 @@ class LlmChatWidget extends StatefulWidget {
   /// Optional custom User-Agent string.
   final String? userAgent;
 
+  /// Optional [WebViewEnvironment] for sharing a persistent browser profile.
+  /// On Windows, this shares the WebView2 user data folder (cookies, cache)
+  /// with other WebViews in the calling app. If not provided, the default
+  /// environment is used.
+  final WebViewEnvironment? webViewEnvironment;
+
   const LlmChatWidget({
     super.key,
     required this.controller,
     this.cookiePersistence,
     this.userAgent,
+    this.webViewEnvironment,
   });
 
   @override
@@ -73,7 +79,7 @@ class LlmChatWidget extends StatefulWidget {
 }
 
 class _LlmChatWidgetState extends State<LlmChatWidget> {
-  PlatformWebView? _webView;
+  InAppWebViewController? _controller;
   bool _initialized = false;
   bool _disposed = false;
 
@@ -92,60 +98,27 @@ class _LlmChatWidgetState extends State<LlmChatWidget> {
   }
 
   Future<void> _initWebView() async {
-    _log('Initializing WebView (cross-platform)...');
-
-    final webView = PlatformWebViewFactory.create();
-
-    // Set up callbacks before initialize
-    webView.onMessageReceived = (String message) {
-      if (_disposed) return;
-      _log('JS Bridge received: "${message.length > 100 ? "${message.substring(0, 100)}..." : message}"');
-      _ctrl.receiveFromLlm(message);
-    };
-
-    webView.onPageFinished = (String url) {
-      if (_disposed) return;
-      _log('Page finished loading: $url');
-      _onPageLoaded(url);
-    };
-
-    try {
-      await webView.initialize();
-    } catch (e) {
-      _log('WebView initialization FAILED: $e');
-      return;
-    }
-
-    if (_disposed) {
-      _log('Widget disposed during WebView init, cleaning up');
-      webView.dispose();
-      return;
-    }
-
-    if (widget.userAgent != null) {
-      await webView.setUserAgent(widget.userAgent!);
-    }
-
-    _webView = webView;
+    _log('Initializing WebView...');
 
     // Wire up controller callbacks
     _ctrl.onNavigate = (url) {
-      if (_disposed || _webView == null) return;
+      if (_disposed || _controller == null) return;
       _log('Controller requested navigation to: $url');
-      _webView!.loadUrl(url);
+      _controller!.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
     };
 
     _ctrl.onRunJavaScript = (js) async {
-      if (_disposed || _webView == null) return null;
+      if (_disposed || _controller == null) return null;
       _log('Running JS (${js.length} chars)');
-      await _webView!.runJavaScript(js);
+      await _controller!.evaluateJavascript(source: js);
       return null;
     };
 
     _ctrl.onRunJavaScriptReturningResult = (js) async {
-      if (_disposed || _webView == null) return '';
+      if (_disposed || _controller == null) return '';
       _log('Running JS with result (${js.length} chars)');
-      return await _webView!.runJavaScriptReturningResult(js);
+      final result = await _controller!.evaluateJavascript(source: js);
+      return result?.toString() ?? '';
     };
 
     // Load cookies if persistence is available
@@ -162,6 +135,23 @@ class _LlmChatWidgetState extends State<LlmChatWidget> {
 
     if (_disposed) return;
     setState(() => _initialized = true);
+  }
+
+  void _onWebViewCreated(InAppWebViewController controller) {
+    _controller = controller;
+
+    // Register JS → Dart bridge handler
+    controller.addJavaScriptHandler(
+      handlerName: 'LlmBridge',
+      callback: (args) {
+        if (_disposed || args.isEmpty) return;
+        final text = args[0]?.toString() ?? '';
+        if (text.isNotEmpty) {
+          _log('JS Bridge received: "${text.length > 100 ? "${text.substring(0, 100)}..." : text}"');
+          _ctrl.receiveFromLlm(text);
+        }
+      },
+    );
 
     // Trigger initial reset to load the LLM page
     _ctrl.resetLlm();
@@ -169,7 +159,7 @@ class _LlmChatWidgetState extends State<LlmChatWidget> {
 
   Future<void> _onPageLoaded(String url) async {
     if (_disposed) return;
-    _log('_onPageLoaded: $url');
+    _log('Page finished loading: $url');
 
     // Save cookies after page load
     if (widget.cookiePersistence != null) {
@@ -179,7 +169,6 @@ class _LlmChatWidgetState extends State<LlmChatWidget> {
     // Delay slightly to let page JS settle
     await Future.delayed(const Duration(seconds: 2));
 
-    // Guard: widget may have been disposed during the delay
     if (_disposed) {
       _log('Widget disposed during page load delay, skipping JS setup');
       return;
@@ -190,11 +179,14 @@ class _LlmChatWidgetState extends State<LlmChatWidget> {
   }
 
   Future<void> _saveCookies() async {
-    if (_disposed || widget.cookiePersistence == null || _webView == null) return;
+    if (_disposed || widget.cookiePersistence == null || _controller == null) {
+      return;
+    }
     try {
-      final cookieStr = await _webView!
-          .runJavaScriptReturningResult('document.cookie');
+      final result = await _controller!
+          .evaluateJavascript(source: 'document.cookie');
       if (_disposed) return;
+      final cookieStr = result?.toString() ?? '';
       final cookieMap = <String, String>{};
       final raw = cookieStr.replaceAll('"', '');
       if (raw.isNotEmpty) {
@@ -219,16 +211,32 @@ class _LlmChatWidgetState extends State<LlmChatWidget> {
   void dispose() {
     _log('Widget disposing');
     _disposed = true;
-    _webView?.dispose();
-    _webView = null;
+    _controller?.dispose();
+    _controller = null;
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_initialized || _webView == null) {
+    if (!_initialized) {
       return const Center(child: CircularProgressIndicator());
     }
-    return _webView!.buildWidget();
+
+    final settings = InAppWebViewSettings(
+      javaScriptEnabled: true,
+      userAgent: widget.userAgent ?? '',
+      allowUniversalAccessFromFileURLs: true,
+      mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+    );
+
+    return InAppWebView(
+      webViewEnvironment: widget.webViewEnvironment,
+      initialSettings: settings,
+      onWebViewCreated: _onWebViewCreated,
+      onLoadStop: (controller, url) {
+        if (_disposed) return;
+        _onPageLoaded(url?.toString() ?? '');
+      },
+    );
   }
 }

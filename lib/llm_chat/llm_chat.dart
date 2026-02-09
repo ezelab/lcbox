@@ -37,7 +37,6 @@
 /// - [LlmJsProvider] — Base class for LLM-specific JavaScript snippets (with factory)
 /// - [LlmChatController] — Core controller managing queue, state, and callbacks
 /// - [LlmChatWidget] — The Flutter widget embedding the WebView (cross-platform)
-/// - [PlatformWebView] — Abstract WebView interface (auto-selects per platform)
 /// - [CookiePersistence] — Abstract interface for cookie/state persistence
 /// - [FileCookiePersistence] — File-based implementation of cookie persistence
 library;
@@ -47,5 +46,3 @@ export 'llm_js_provider.dart';
 export 'llm_chat_controller.dart';
 export 'llm_chat_widget.dart';
 export 'cookie_persistence.dart';
-export 'platform/platform_webview.dart';
-export 'platform/platform_webview_factory.dart';

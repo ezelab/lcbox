@@ -9,8 +9,7 @@ import '../llm_js_provider.dart';
 /// ## Cross-Platform Bridge
 /// The clipboard hook uses `window.__llmBridge(text)` which is set up by the
 /// controller on page load to route to the correct platform-specific bridge:
-/// - `webview_flutter`: `LlmBridge.postMessage(text)`
-/// - `webview_windows`: `window.chrome.webview.postMessage(text)`
+/// `window.flutter_inappwebview.callHandler('LlmBridge', text)` (flutter_inappwebview).
 mixin DefaultJsSnippets implements LlmJsProvider {
   @override
   String jsInstallCopyMutationObserver() {
@@ -120,18 +119,15 @@ mixin DefaultJsSnippets implements LlmJsProvider {
   /// Returns JavaScript that installs the cross-platform bridge shim.
   ///
   /// This must be run BEFORE [jsHookClipboard]. It sets up
-  /// `window.__llmBridge(text)` to route messages to the correct
-  /// platform-specific bridge.
+  /// `window.__llmBridge(text)` to route messages to the Dart handler
+  /// registered by `flutter_inappwebview`.
   static String jsInstallBridgeShim() {
     return '''
 (function() {
   if (window.__llmBridge) return;
-  if (typeof LlmBridge !== 'undefined' && LlmBridge.postMessage) {
-    window.__llmBridge = function(text) { LlmBridge.postMessage(text); };
-    console.log('LlmChat: Bridge shim installed (webview_flutter)');
-  } else if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
-    window.__llmBridge = function(text) { window.chrome.webview.postMessage(text); };
-    console.log('LlmChat: Bridge shim installed (webview_windows)');
+  if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+    window.__llmBridge = function(text) { window.flutter_inappwebview.callHandler('LlmBridge', text); };
+    console.log('LlmChat: Bridge shim installed (flutter_inappwebview)');
   } else {
     window.__llmBridge = function(text) { console.warn('LlmChat: No bridge available, message lost:', text.substring(0,100)); };
     console.warn('LlmChat: No bridge found, using fallback');

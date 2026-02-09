@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:llmchatbox/llmchatbox.dart';
+import 'file_cookie_persistence.dart';
 
 void main() {
   runApp(const LlmTestHarnessApp());
