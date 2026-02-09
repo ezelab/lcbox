@@ -209,15 +209,15 @@ class _LlmChatWidgetState extends State<LlmChatWidget> {
 
   @override
   void dispose() {
-    if (_disposed) {
-      super.dispose();
-      return;
-    }
     _log('Widget disposing');
     _disposed = true;
     final c = _controller;
     _controller = null;
-    c?.dispose();
+    try {
+      c?.dispose();
+    } catch (_) {
+      // Controller may already be disposed by the WebView internally
+    }
     super.dispose();
   }
 
