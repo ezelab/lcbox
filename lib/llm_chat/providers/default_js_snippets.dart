@@ -44,7 +44,7 @@ mixin DefaultJsSnippets implements LlmJsProvider {
             }
           }
           if (label.includes('copy') || label.includes('clipboard')) {
-            if (label.includes('prompt')) {
+            if (label.includes('prompt') || label.includes('table')) {
               skippedPrompt++;
             } else if (window.__llmClickedCopyBtns.has(el)) {
               skippedAlready++;
@@ -61,7 +61,7 @@ mixin DefaultJsSnippets implements LlmJsProvider {
       });
     });
     if (clicked === 0 && totalCandidates > 0) {
-      dbg('no-click: candidates=' + totalCandidates + ' noMatch=' + noLabel + ' skippedPrompt=' + skippedPrompt + ' skippedAlready=' + skippedAlready);
+      // dbg('no-click: candidates=' + totalCandidates + ' noMatch=' + noLabel + ' skippedPrompt=' + skippedPrompt + ' skippedAlready=' + skippedAlready);
     }
   });
   observer.observe(document.body, {childList: true, subtree: true});
