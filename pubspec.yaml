@@ -3,9 +3,9 @@ description: >
   A reusable Flutter widget that wraps LLM web interfaces (Gemini, ChatGPT,
   Claude, Copilot, Meta AI, DeepSeek) in a WebView with programmatic message
   send/receive via clipboard interception and copy-button auto-clicking.
-publish_to: 'none'
+repository: https://github.com/ezelab/lcbox
 
-version: 1.0.0+1
+version: 1.0.0
 
 environment:
   sdk: ^3.6.1
